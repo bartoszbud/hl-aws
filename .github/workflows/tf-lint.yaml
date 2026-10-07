@@ -3,14 +3,14 @@ name: Terraform lint
 on:
   push:
     paths:
-      - infra/**
+      - iac/**
 
 jobs:
   main:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./infra
+        working-directory: ./iac
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7

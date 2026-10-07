@@ -1,0 +1,154 @@
+name: Terraform plan
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - infra/**
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      roots_json: ${{ steps.detect-changes.outputs.roots_json }}
+      modules_json: ${{ steps.detect-changes.outputs.modules_json }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Detect changes
+        id: detect-changes
+        run: |
+          changed_files=$(git diff --name-only origin/main...HEAD -- 'infra/**')
+          direct_roots=()
+          changed_modules=()
+
+          for file in $changed_files; do
+            if [[ "$file" == infra/envs/* ]]; then
+              dir=$(dirname "$file")
+              
+              while [[ "$dir" != "infra/envs" && ! -f "$dir/backend.tf" ]]; do
+                dir=$(dirname "$dir")
+              done
+
+              if [[ -f "$dir/backend.tf" ]]; then
+                direct_roots+=("$dir")
+              fi
+            elif [[ "$file" == infra/modules/* ]]; then
+              dir=$(dirname "$file")
+              changed_modules+=("$dir")
+            fi
+          done
+
+          direct_roots=($(printf "%s\n" "${direct_roots[@]}" | sort -u))
+          changed_modules=($(printf "%s\n" "${changed_modules[@]}" | sort -u))
+
+          echo "${direct_roots[@]}"
+          echo "${changed_modules[@]}"
+
+          roots=$(printf '%s\n' "${direct_roots[@]}" | grep -v '^$' | jq -R -s -c 'split("\n")[:-1]')
+          modules=$(printf '%s\n' "${changed_modules[@]}" | grep -v '^$' | jq -R -s -c 'split("\n")[:-1]')
+
+          echo "roots_json=$roots" >> "$GITHUB_OUTPUT"
+          echo "modules_json=$modules" >> "$GITHUB_OUTPUT"
+  
+  validate:
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.modules_json != '[]'
+    strategy:
+      matrix:
+        dir: ${{ fromJson(needs.detect-changes.outputs.modules_json)}}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.14.6"
+
+      - name: Initialize terraform
+        id: init
+        run: terraform init -backend=false -no-color
+        working-directory: ${{ matrix.dir }}
+
+      - name: Validate terraform
+        id: validate
+        run: terraform validate -no-color
+        working-directory: ${{ matrix.dir }}
+
+  plan:
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.roots_json != '[]'
+    strategy:
+      matrix: 
+        dir: ${{ fromJson(needs.detect-changes.outputs.roots_json) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-region: eu-west-1
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsRole
+      
+      - name: Setup terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.14.6"
+
+      - name: Initialize terraform
+        id: init
+        run: terraform init -no-color
+        working-directory: ${{ matrix.dir }}
+
+      - name: Validate terraform
+        id: validate
+        run: terraform validate -no-color
+        working-directory: ${{ matrix.dir }}
+
+      - name: Generate plan
+        id: plan
+        continue-on-error: false
+        run: terraform plan -no-color -out=tfplan
+        working-directory: ${{ matrix.dir }}
+        
+      - name: Comment plan to PR
+        uses: actions/github-script@v9
+        env:
+          PLAN: ${{ steps.plan.outputs.stdout }}
+        with:
+          script: |
+            const dir = '${{ matrix.dir }}';
+            const module = dir.replace(/^infra\/envs\//, '');
+            
+            const plan = process.env.PLAN || '';
+            const planTruncated = plan.length > 60000
+              ? plan.substring(0, 60000) + '\n\n... (truncated)'
+              : plan;
+
+            const body = [
+              '### Terraform Plan for ' + module,
+              '```',
+              planTruncated,
+              '```',
+              '*Plan exit code: ${{ steps.plan.outputs.exitcode }}*'
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });

@@ -3,7 +3,7 @@ name: Terraform lint
 on:
   push:
     paths:
-      - infra/**
+      - iac/**
 
 jobs:
   main:

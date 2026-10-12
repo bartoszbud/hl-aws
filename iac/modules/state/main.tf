@@ -1,3 +1,7 @@
+data "aws_kms_alias" "state_key" {
+  name = "alias/${var.key_name}"
+}
+
 resource "aws_s3_bucket" "state" {
   bucket_prefix = "${var.environment}-${var.module_name}-state-"
   force_destroy = false
@@ -82,3 +86,25 @@ resource "aws_s3_bucket_lifecycle_configuration" "state_logs_bucket_lifecycle_co
 
 #ignore state access logs bucket encryption with customer key - logs only
 #tfsec:ignore:aws-s3-encryption-customer-key
+resource "aws_s3_bucket_server_side_encryption_configuration" "state_encryption" {
+  bucket = aws_s3_bucket.state.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      kms_master_key_id = data.aws_kms_alias.state_key.arn
+      sse_algorithm     = "aws:kms"
+    }
+
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "state_logs_encryption" {
+  bucket = aws_s3_bucket.state_logs.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      kms_master_key_id = data.aws_kms_alias.state_key.arn
+      sse_algorithm     = "aws:kms"
+    }
+  }
+}

@@ -1,14 +1,23 @@
-data "aws_kms_alias" "state_key" {
-  name = "alias/${var.key_name}"
+data "aws_caller_identity" "current" {}
+
+resource "aws_kms_key" "kms_key" {
+  description             = "${var.environment} state bucket key"
+  deletion_window_in_days = var.deletion_window_in_days
+  enable_key_rotation     = var.key_rotation
+}
+
+resource "aws_kms_alias" "kms_key_alias" {
+  target_key_id = aws_kms_key.kms_key.id
+  name          = "alias/kms-${var.environment}-${var.module_name}"
 }
 
 resource "aws_s3_bucket" "state" {
-  bucket_prefix = "${var.environment}-${var.module_name}-state-"
+  bucket_prefix = "${var.environment}-state-${data.aws_caller_identity.current.account_id}"
   force_destroy = false
 
   tags = {
     Environment = var.environment
-    Purpose     = "${var.module_name} state bucker for ${var.environment} environment"
+    Purpose     = "State bucket for ${var.environment} environment"
   }
 }
 
@@ -49,7 +58,6 @@ resource "aws_s3_bucket_logging" "state_bucket_logging" {
   target_prefix = "logs/"
 }
 
-# disable state logs bucket logging check - no need to enable logging for this bucket as it is used for storing logs from other buckets
 #tfsec:ignore:aws-s3-enable-versioning
 #tfsec:ignore:aws-s3-enable-bucket-logging
 resource "aws_s3_bucket" "state_logs" {
@@ -58,7 +66,7 @@ resource "aws_s3_bucket" "state_logs" {
 
   tags = {
     Environment = var.environment
-    Purpose     = "${var.module_name} state logs bucker for ${var.environment} environment"
+    Purpose     = "${var.module_name} state logs bucket for ${var.environment} environment"
   }
 }
 
@@ -84,14 +92,12 @@ resource "aws_s3_bucket_lifecycle_configuration" "state_logs_bucket_lifecycle_co
   }
 }
 
-#ignore state access logs bucket encryption with customer key - logs only
-#tfsec:ignore:aws-s3-encryption-customer-key
 resource "aws_s3_bucket_server_side_encryption_configuration" "state_encryption" {
   bucket = aws_s3_bucket.state.id
 
   rule {
     apply_server_side_encryption_by_default {
-      kms_master_key_id = data.aws_kms_alias.state_key.arn
+      kms_master_key_id = aws_kms_alias.kms_key_alias.arn
       sse_algorithm     = "aws:kms"
     }
 
@@ -103,7 +109,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "state_logs_encryp
 
   rule {
     apply_server_side_encryption_by_default {
-      kms_master_key_id = data.aws_kms_alias.state_key.arn
+      kms_master_key_id = aws_kms_alias.kms_key_alias.arn
       sse_algorithm     = "aws:kms"
     }
   }

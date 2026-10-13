@@ -12,7 +12,7 @@ resource "aws_kms_alias" "kms_key_alias" {
 }
 
 resource "aws_s3_bucket" "state" {
-  bucket_prefix = "${var.environment}-state-${data.aws_caller_identity.current.account_id}"
+  bucket        = "${var.environment}-state-${data.aws_caller_identity.current.account_id}"
   force_destroy = false
 
   tags = {
@@ -61,12 +61,12 @@ resource "aws_s3_bucket_logging" "state_bucket_logging" {
 #tfsec:ignore:aws-s3-enable-versioning
 #tfsec:ignore:aws-s3-enable-bucket-logging
 resource "aws_s3_bucket" "state_logs" {
-  bucket_prefix = "${var.environment}-${var.module_name}-state-logs-"
+  bucket        = "${var.environment}-state-logs-${data.aws_caller_identity.current.account_id}"
   force_destroy = false
 
   tags = {
     Environment = var.environment
-    Purpose     = "${var.module_name} state logs bucket for ${var.environment} environment"
+    Purpose     = "State logs bucket for ${var.environment} environment"
   }
 }
 

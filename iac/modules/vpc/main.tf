@@ -1,3 +1,5 @@
+data "aws_caller_identity" "current" {}
+
 resource "aws_vpc" "vpc" {
   cidr_block           = var.cidr_block
   enable_dns_support   = true
@@ -7,6 +9,13 @@ resource "aws_vpc" "vpc" {
     Name        = "${var.environment}-vpc"
     Description = "VPC for ${var.environment} environment"
   }
+}
+
+resource "aws_flow_log" "flow_logs" {
+  vpc_id               = aws_vpc.vpc.id
+  traffic_type         = "REJECT"
+  log_destination_type = "s3"
+  log_destination      = ""
 }
 
 resource "aws_subnet" "subnet" {

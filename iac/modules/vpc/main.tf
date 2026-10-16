@@ -71,8 +71,8 @@ resource "aws_route_table" "private" {
   vpc_id = aws_vpc.vpc.id
 
   route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_nat_gateway.nat_gateway.id
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.nat_gateway.id
   }
 
   tags = {
@@ -84,4 +84,38 @@ resource "aws_route_table_association" "associations" {
   for_each       = aws_subnet.subnet
   subnet_id      = each.value.id
   route_table_id = var.subnet[each.key].map_public_ip_on_launch ? aws_route_table.public.id : aws_route_table.private.id
+}
+
+resource "aws_security_group" "security_group" {
+  for_each = var.security_groups
+  vpc_id   = aws_vpc.vpc.id
+  name     = each.value.name
+
+  dynamic "ingress" {
+    for_each = each.value.ingress
+    content {
+      protocol        = ingress.value.protocol
+      from_port       = ingress.value.from_port
+      to_port         = ingress.value.to_port
+      cidr_blocks     = ingress.value.cidr_ipv4
+      security_groups = ingress.value.sg
+      description     = ingress.value.description
+    }
+  }
+
+  dynamic "egress" {
+    for_each = coalesce(each.value.egress, {})
+    content {
+      protocol        = egress.value.protocol
+      from_port       = egress.value.from_port
+      to_port         = egress.value.to_port
+      cidr_blocks     = egress.value.cidr_ipv4
+      security_groups = egress.value.sg
+      description     = egress.value.description
+    }
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }

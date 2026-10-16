@@ -26,3 +26,27 @@ variable "subnet" {
     map_public_ip_on_launch = bool
   }))
 }
+
+variable "security_groups" {
+  description = "Map of security groups"
+  type = map(object({
+    name        = string
+    description = string
+    ingress = map(object({
+      protocol    = string
+      from_port   = number
+      to_port     = number
+      cidr_ipv4   = optional(list(string))
+      sg          = optional(list(string))
+      description = optional(string)
+    }))
+    egress = optional(map(object({
+      protocol    = string
+      from_port   = number
+      to_port     = number
+      cidr_ipv4   = optional(list(string))
+      sg          = optional(list(string))
+      description = optional(string)
+    })))
+  }))
+}

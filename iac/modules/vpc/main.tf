@@ -11,13 +11,6 @@ resource "aws_vpc" "vpc" {
   }
 }
 
-resource "aws_flow_log" "flow_logs" {
-  vpc_id               = aws_vpc.vpc.id
-  traffic_type         = "REJECT"
-  log_destination_type = "s3"
-  log_destination      = ""
-}
-
 resource "aws_subnet" "subnet" {
   for_each                = var.subnet
   vpc_id                  = aws_vpc.vpc.id

@@ -1,4 +1,4 @@
-data "aws_caller_identity" "current" {}
+//data "aws_caller_identity" "current" {}
 
 resource "aws_vpc" "vpc" {
   cidr_block           = var.cidr_block

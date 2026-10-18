@@ -38,14 +38,8 @@ resource "aws_nat_gateway" "nat_gateway" {
   tags = {
     Name = "${var.environment}-nat-gateway"
   }
-}
 
-resource "aws_eip" "eip" {
-  domain = "vpc"
-
-  tags = {
-    Name = "${var.environment}-eip"
-  }
+  depends_on = [aws_internet_gateway.igw]
 }
 
 resource "aws_route_table" "public" {

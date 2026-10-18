@@ -1,5 +1,3 @@
-//data "aws_caller_identity" "current" {}
-
 resource "aws_vpc" "vpc" {
   cidr_block           = var.cidr_block
   enable_dns_support   = true
@@ -74,9 +72,10 @@ resource "aws_route_table_association" "associations" {
 }
 
 resource "aws_security_group" "security_group" {
-  for_each = var.security_groups
-  vpc_id   = aws_vpc.vpc.id
-  name     = each.value.name
+  for_each    = var.security_groups
+  vpc_id      = aws_vpc.vpc.id
+  name        = each.value.name
+  description = each.value.description
 
   dynamic "ingress" {
     for_each = each.value.ingress

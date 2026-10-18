@@ -99,8 +99,32 @@ data "aws_iam_policy_document" "logging" {
   }
 }
 
+data "aws_iam_policy_document" "bucket_policy" {
+  source_policy_documents = var.enable_logging ? [data.aws_iam_policy_document.logging[0].json] : []
+
+  statement {
+    sid       = "DenyInsecureTransport"
+    effect    = "Deny"
+    actions   = ["s3:*"]
+    resources = [aws_s3_bucket.bucket.arn, "${aws_s3_bucket.bucket.arn}/*"]
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+
+    condition {
+      test     = "Bool"
+      variable = "aws:SecureTransport"
+      values   = ["false"]
+    }
+  }
+}
+
 resource "aws_s3_bucket_policy" "logging" {
   count  = var.enable_logging ? 1 : 0
   bucket = aws_s3_bucket.bucket.id
-  policy = data.aws_iam_policy_document.logging[0].json
+  policy = data.aws_iam_policy_document.bucket_policy.json
+
+  depends_on = [aws_s3_bucket_public_access_block.bucket_public_access_config]
 }

@@ -9,9 +9,6 @@ on:
 jobs:
   main:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./iac
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -19,4 +16,4 @@ jobs:
       - name: Run security scan
         uses: aquasecurity/tfsec-action@v1.0.3
         with:
-          additional_args: --config-file ../.tfsec.yaml
+          additional_args: --config-file .tfsec.yaml

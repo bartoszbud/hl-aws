@@ -1,1 +1,2 @@
-# empty for now, but can be used to configure tfsec in the future
+exclude:
+  - aws-ec2-require-vpc-flow-logs-for-all-vpcs

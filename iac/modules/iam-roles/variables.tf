@@ -13,6 +13,12 @@ variable "assume_role_policy" {
   type        = string
 }
 
+variable "policies" {
+  description = "List of IAM policy ARNs to attach to the role."
+  type        = list(string)
+  default     = []
+}
+
 variable "tags" {
   description = "IAM role tags"
   type        = map(string)
